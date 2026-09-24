@@ -162,6 +162,16 @@ Fetches are bounded by:
   layers by digest (default: a `soroban-upgrade-safeguard/oci-cache`
   directory under the OS temp dir).
 
+Verified layers are cached content-addressed by digest, so a re-run skips the
+blob download:
+
+- The `SOROBAN_SAFEGUARD_OCI_CACHE` environment variable overrides the
+  default cache location; `--oci-cache-dir` overrides both.
+- `--no-oci-cache` bypasses reading and writing the cache for a single run,
+  without deleting anything already cached.
+- `--clear-oci-cache` deletes every cached `oci://` artifact under the cache
+  directory and exits without running a comparison.
+
 See [OCI registry inputs](docs/documentation.md#oci-registry-inputs) for the
 full reference syntax, layer selection, and registry authentication.
 
