@@ -260,6 +260,55 @@ cat ./wasm/v2.wasm | soroban-upgrade-safeguard ./wasm/v1.wasm -
 Only one positional input may be `-`; using `-` for both `OLD_WASM` and
 `NEW_WASM` is rejected because stdin can only be consumed once.
 
+### Symlinked inputs
+
+By default a symlinked WASM input is **followed** — through however many hops
+the chain has — and the resolved target is recorded in the report's provenance,
+so a verdict can always be traced to the bytes it actually judged:
+
+```
+Symlink:  ./wasm/current.wasm -> /builds/2024-06-11/token.wasm
+```
+
+The same pair appears in Markdown, and in JSON as `provenance.symlinks[]` with
+`requested` and `resolved` entries. This matters because a path like
+`./wasm/current.wasm` can point at a different build tomorrow; without the
+resolved target, two reports that name the same input could describe different
+bytecode with nothing to tell them apart.
+
+`--no-symlinks` rejects such an input instead of following it, for pipelines
+where an input must be a direct file:
+
+```bash
+soroban-upgrade-safeguard ./wasm/current.wasm ./wasm/v2.wasm --no-symlinks
+```
+
+```
+Error: Symlink input rejected by policy: './wasm/current.wasm' resolves to
+'/builds/2024-06-11/token.wasm'. Pass a direct file, or drop --no-symlinks to
+allow symlinked inputs.
+```
+
+The rejection names the resolved target as well as the link, so a failure tells
+you what would have been analyzed rather than only that something was refused.
+It exits non-zero without comparing anything.
+
+Two limits are worth knowing:
+
+- The check applies to the **final component** of the path, including a chain of
+  several links. A symlinked *parent directory* is not rejected, so
+  `--no-symlinks` is not a guarantee that no part of the path traversed a link.
+- It applies only to local paths. Reading from stdin (`-`), an RPC baseline, an
+  `https://` reference, or an `oci://` reference has no symlink to resolve, and
+  the flag has no effect on them.
+
+A broken link or a symlink cycle is always an error, named as such, whether or
+not `--no-symlinks` is in effect.
+
+Because a resolved target is absolute, it can reveal a username or workspace
+layout. Use `--redact-paths` when a report is published somewhere the local
+filesystem layout should not be.
+
 ### Suppressing known breaking changes
 
 If a breaking change is deliberate and already accounted for, list it in a
