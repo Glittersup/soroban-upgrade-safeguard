@@ -108,6 +108,48 @@ and the [RPC Security Checklist](docs/rpc-security-checklist.md) for an
 operational checklist covering endpoint trust, credentials, and report
 retention.
 
+#### Pinning the expected baseline hash
+
+Fetching a baseline over RPC means trusting the endpoint to answer with the
+bytes actually deployed. `--expected-wasm-hash` removes that trust: it asserts
+the SHA-256 of the on-chain WASM baseline, so the comparison fails if the
+fetched — or locally loaded — baseline is not the bytes you expected.
+
+The value is a 64-character hex SHA-256 digest, upper or lower case:
+
+```bash
+soroban-upgrade-safeguard \
+  --contract-id CABCD1234... \
+  --rpc-url https://soroban-testnet.stellar.org \
+  --expected-wasm-hash 31fc0a23f04c6fc647ac44ba791228d8f0f12308685f0ac3798d37c79518906b \
+  ./wasm/v2.wasm
+```
+
+On a mismatch the run **fails immediately with exit code 1, before any
+comparison is performed**, and prints both digests so you can see which build
+you actually got:
+
+```
+Error: Baseline hash mismatch for 'CABCD1234...'
+  expected: 0000000000000000000000000000000000000000000000000000000000000000
+  actual:   31fc0a23f04c6fc647ac44ba791228d8f0f12308685f0ac3798d37c79518906b
+```
+
+Failing before the comparison is deliberate: a report built against an
+unverified baseline is exactly what this flag exists to prevent, so no verdict
+is emitted at all rather than one that looks authoritative but compares the
+candidate to the wrong build.
+
+A value that is not a 64-character hex digest is rejected as a **configuration
+error**, worded differently from a mismatch — a wrong flag and a wrong
+deployment need to send you to different places.
+
+The flag also works with a local baseline, where it pins which build a
+comparison was run against for the audit trail. Note that RPC mode already
+verifies the fetched bytecode against the on-chain contract instance hash on
+every run; this flag adds the second, independent check that the on-chain build
+is the specific one you reviewed.
+
 ### Validating against captured storage entries
 
 Structural comparison answers whether the *shapes* the new build declares are
