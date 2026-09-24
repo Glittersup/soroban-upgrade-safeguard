@@ -590,6 +590,38 @@ For a stable identifier meant for tooling rather than people — one that surviv
 a name being reworded — use the separate [`id`](docs/batch_manifests.md#pair-ids)
 field.
 
+#### Capping how many pairs a manifest may contain
+
+[`--max-pairs <N>`](docs/batch_manifests.md#--max-pairs) bounds the total number
+of pairs a composed manifest may contain — every pair from every included file,
+summed together. The default is **500**: generous enough for any manifest a
+person would compose by hand, including a large monorepo, while still catching a
+runaway one.
+
+The check runs as soon as the composition is parsed, **before any WASM is
+loaded** for any pair. A bad template loop or a script gone wrong can emit
+thousands of pairs, and the failure should be a configuration error naming the
+count — not the tool grinding through comparisons until something else gives
+out:
+
+```bash
+soroban-upgrade-safeguard --manifest release.toml --max-pairs 50
+```
+
+```
+Manifest composition contains 812 pairs, exceeding the maximum of 500 (--max-pairs).
+  root: /repo/release.toml
+Raise --max-pairs if this many pairs is intentional, or check for a manifest
+generation mistake.
+```
+
+The limit **cannot be raised from inside a manifest**. There is no
+`[defaults].max_pairs` and no per-pair equivalent, and because the manifest
+schema rejects unknown keys, writing one is a hard parse error rather than a
+setting that is quietly ignored. The ceiling exists to guard against the
+manifest itself going wrong, so the command line is the only place it can be
+set — a file cannot raise the limit that is there to bound it.
+
 See [Batch Manifests](docs/batch_manifests.md) for the full schema, includes,
 schema coverage rules, path rules, and JSON provenance.
 
