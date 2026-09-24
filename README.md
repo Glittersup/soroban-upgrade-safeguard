@@ -108,6 +108,33 @@ and the [RPC Security Checklist](docs/rpc-security-checklist.md) for an
 operational checklist covering endpoint trust, credentials, and report
 retention.
 
+### Remote HTTPS inputs
+
+Anywhere the tool accepts a local WASM path, it also accepts a `https://` URL
+carrying a `#sha256=<hex>` fragment with the expected digest, so a release
+pipeline that publishes artifacts to object storage does not need a separate
+download-and-verify step:
+
+```bash
+soroban-upgrade-safeguard old.wasm \
+  "https://releases.example.com/v2/contract.wasm#sha256=3b1a2c9e4d5f60718293847566172839405162738495061728394051627384"
+```
+
+The digest is mandatory and the fragment is never sent over the wire. See
+[Remote HTTPS inputs](docs/documentation.md#remote-https-inputs) for the full
+reference syntax and transport policy.
+
+Verified downloads are cached content-addressed by digest, so a re-run reuses
+the bytes instead of re-fetching them:
+
+- `--remote-cache-dir <DIR>` sets the cache location, overriding the
+  `SOROBAN_SAFEGUARD_REMOTE_CACHE` environment variable and the default (a
+  `soroban-upgrade-safeguard/remote-cache` directory under the OS temp dir).
+- `--no-remote-cache` bypasses reading and writing the cache for a single
+  run, without deleting anything already cached.
+- `--clear-remote-cache` deletes every cached artifact under the cache
+  directory and exits without running a comparison.
+
 ### Validating against captured storage entries
 
 Structural comparison answers whether the *shapes* the new build declares are
