@@ -267,6 +267,59 @@ asks for a specific config and the other for none, and guessing which was meant
 is exactly the wrong behavior for a safety gate. `--search-parent-config` is
 rejected alongside `--no-config` for the same reason. To run against a known
 config instead of the ambient one, pass `--config <PATH>` on its own.
+
+#### Seeing what actually resolved
+
+With config arriving from flags, environment variables, a config file, and — in
+batch mode — a manifest, "which layer won?" stops being obvious. `--show-config`
+answers it directly: it prints the fully resolved configuration with the origin
+of every value, then **exits without analyzing any WASM inputs**. No positional
+arguments are needed, and nothing is loaded, parsed, or compared.
+
+```bash
+soroban-upgrade-safeguard --show-config
+```
+
+Each line is a dotted path, the resolved value, and the layer that decided it:
+
+```
+config_file = .safeguard.toml  (auto-discovered .safeguard.toml)
+input.expected_wasm_hash = <none>  (default)
+input.no_symlinks = false  (default)
+batch.max_pairs = 500  (default)
+output.format = text  (default)
+output.strict = true  (cli)
+output.no_color = true  (env (NO_COLOR))
+suppression_policy.max_suppressions = 10  (config file)
+```
+
+The source label is the whole point: `cli`, `env (VAR_NAME)`, `config file`, or
+`default`. A value you expected to come from your `.safeguard.toml` showing up as
+`(default)` is the fastest way to catch a config that never loaded, a mistyped
+key, or a flag quietly overriding the file.
+
+**Secrets are never printed.** RPC header values are not even resolved during
+`--show-config` — only the name of the environment variable that would supply
+them at run time, with the value shown as `<redacted>`:
+
+```
+input.rpc_headers[0].name = Authorization  (cli)
+input.rpc_headers[0].value_from_env = STELLAR_RPC_TOKEN  (cli)
+input.rpc_headers[0].value = <redacted>  (cli)
+```
+
+That makes the output safe to redirect into a CI log or paste into a bug report.
+
+`--format json` produces the same data machine-readable, as a nested tree whose
+leaves are `{"value": ..., "source": ...}` objects — useful for asserting on
+resolved config in CI, or diffing what two environments actually resolve:
+
+```bash
+soroban-upgrade-safeguard --show-config --format json > resolved-config.json
+```
+
+Any other `--format` prints the text listing above.
+
 ### Output format
 
 By default, and whenever `--format` is omitted, the report prints as
