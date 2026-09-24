@@ -135,6 +135,36 @@ the bytes instead of re-fetching them:
 - `--clear-remote-cache` deletes every cached artifact under the cache
   directory and exits without running a comparison.
 
+### OCI registry inputs
+
+Anywhere the tool accepts a local WASM path, it also accepts an `oci://`
+reference to an artifact published to an OCI-compatible registry:
+
+```bash
+soroban-upgrade-safeguard old.wasm \
+  "oci://ghcr.io/example/contracts@sha256:3b1a2c9e4d5f60718293847566172839405162738495061728394051627384"
+```
+
+A pinned `@sha256:<hex>` digest is required by default, and the manifest is
+verified against it before anything downstream is trusted. Pass
+`--allow-oci-tags` to allow an `oci://` input to reference a mutable tag
+(e.g. `oci://ghcr.io/example/contracts:v1.2.3`) instead of a pinned digest;
+the resolved digest is printed so the reference can be pinned afterward.
+Off by default.
+
+Fetches are bounded by:
+
+- `--oci-max-bytes <BYTES>`: maximum bytes accepted for any `oci://`
+  manifest or layer download (default 64 MiB).
+- `--oci-timeout-secs <SECONDS>`: timeout, in seconds, for any single
+  `oci://` registry request (default 30).
+- `--oci-cache-dir <DIR>`: directory used to cache verified `oci://` input
+  layers by digest (default: a `soroban-upgrade-safeguard/oci-cache`
+  directory under the OS temp dir).
+
+See [OCI registry inputs](docs/documentation.md#oci-registry-inputs) for the
+full reference syntax, layer selection, and registry authentication.
+
 ### Validating against captured storage entries
 
 Structural comparison answers whether the *shapes* the new build declares are
