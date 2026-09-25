@@ -427,13 +427,24 @@ soroban-upgrade-safeguard ./wasm/v1.wasm ./wasm/v2.wasm --format markdown
 
 ### Multiple output formats
 
-Emit the same report in several formats and destinations in a single run:
+`--output` accepts a `FORMAT:PATH` specification or a bare path, and can be
+repeated to write several destinations in a single run:
+
+- **`FORMAT:PATH`** (e.g. `json:report.json`) writes that format to that
+  file, regardless of `--format`.
+- **A bare path** (e.g. `report.md`) writes to that file using the format
+  selected by `--format`, or **text** (the default) if `--format` is omitted.
 
 ```bash
 # Write JSON to a file, Markdown to another, and print text to stdout
 soroban-upgrade-safeguard ./wasm/v1.wasm ./wasm/v2.wasm \
   --output json:report.json \
   --output markdown:report.md
+
+# A bare path resolves its format from --format: this writes Markdown to report.md
+soroban-upgrade-safeguard ./wasm/v1.wasm ./wasm/v2.wasm \
+  --format markdown \
+  --output report.md
 
 # Write to stdout only (default)
 soroban-upgrade-safeguard ./wasm/v1.wasm ./wasm/v2.wasm
