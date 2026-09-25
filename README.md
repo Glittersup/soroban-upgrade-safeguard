@@ -108,6 +108,73 @@ and the [RPC Security Checklist](docs/rpc-security-checklist.md) for an
 operational checklist covering endpoint trust, credentials, and report
 retention.
 
+### Remote HTTPS inputs
+
+Anywhere the tool accepts a local WASM path, it also accepts a `https://` URL
+carrying a `#sha256=<hex>` fragment with the expected digest, so a release
+pipeline that publishes artifacts to object storage does not need a separate
+download-and-verify step:
+
+```bash
+soroban-upgrade-safeguard old.wasm \
+  "https://releases.example.com/v2/contract.wasm#sha256=3b1a2c9e4d5f60718293847566172839405162738495061728394051627384"
+```
+
+The digest is mandatory and the fragment is never sent over the wire. See
+[Remote HTTPS inputs](docs/documentation.md#remote-https-inputs) for the full
+reference syntax and transport policy.
+
+Verified downloads are cached content-addressed by digest, so a re-run reuses
+the bytes instead of re-fetching them:
+
+- `--remote-cache-dir <DIR>` sets the cache location, overriding the
+  `SOROBAN_SAFEGUARD_REMOTE_CACHE` environment variable and the default (a
+  `soroban-upgrade-safeguard/remote-cache` directory under the OS temp dir).
+- `--no-remote-cache` bypasses reading and writing the cache for a single
+  run, without deleting anything already cached.
+- `--clear-remote-cache` deletes every cached artifact under the cache
+  directory and exits without running a comparison.
+
+### OCI registry inputs
+
+Anywhere the tool accepts a local WASM path, it also accepts an `oci://`
+reference to an artifact published to an OCI-compatible registry:
+
+```bash
+soroban-upgrade-safeguard old.wasm \
+  "oci://ghcr.io/example/contracts@sha256:3b1a2c9e4d5f60718293847566172839405162738495061728394051627384"
+```
+
+A pinned `@sha256:<hex>` digest is required by default, and the manifest is
+verified against it before anything downstream is trusted. Pass
+`--allow-oci-tags` to allow an `oci://` input to reference a mutable tag
+(e.g. `oci://ghcr.io/example/contracts:v1.2.3`) instead of a pinned digest;
+the resolved digest is printed so the reference can be pinned afterward.
+Off by default.
+
+Fetches are bounded by:
+
+- `--oci-max-bytes <BYTES>`: maximum bytes accepted for any `oci://`
+  manifest or layer download (default 64 MiB).
+- `--oci-timeout-secs <SECONDS>`: timeout, in seconds, for any single
+  `oci://` registry request (default 30).
+- `--oci-cache-dir <DIR>`: directory used to cache verified `oci://` input
+  layers by digest (default: a `soroban-upgrade-safeguard/oci-cache`
+  directory under the OS temp dir).
+
+Verified layers are cached content-addressed by digest, so a re-run skips the
+blob download:
+
+- The `SOROBAN_SAFEGUARD_OCI_CACHE` environment variable overrides the
+  default cache location; `--oci-cache-dir` overrides both.
+- `--no-oci-cache` bypasses reading and writing the cache for a single run,
+  without deleting anything already cached.
+- `--clear-oci-cache` deletes every cached `oci://` artifact under the cache
+  directory and exits without running a comparison.
+
+See [OCI registry inputs](docs/documentation.md#oci-registry-inputs) for the
+full reference syntax, layer selection, and registry authentication.
+
 ### Validating against captured storage entries
 
 Structural comparison answers whether the *shapes* the new build declares are
@@ -283,13 +350,24 @@ soroban-upgrade-safeguard ./wasm/v1.wasm ./wasm/v2.wasm --format markdown
 
 ### Multiple output formats
 
-Emit the same report in several formats and destinations in a single run:
+`--output` accepts a `FORMAT:PATH` specification or a bare path, and can be
+repeated to write several destinations in a single run:
+
+- **`FORMAT:PATH`** (e.g. `json:report.json`) writes that format to that
+  file, regardless of `--format`.
+- **A bare path** (e.g. `report.md`) writes to that file using the format
+  selected by `--format`, or **text** (the default) if `--format` is omitted.
 
 ```bash
 # Write JSON to a file, Markdown to another, and print text to stdout
 soroban-upgrade-safeguard ./wasm/v1.wasm ./wasm/v2.wasm \
   --output json:report.json \
   --output markdown:report.md
+
+# A bare path resolves its format from --format: this writes Markdown to report.md
+soroban-upgrade-safeguard ./wasm/v1.wasm ./wasm/v2.wasm \
+  --format markdown \
+  --output report.md
 
 # Write to stdout only (default)
 soroban-upgrade-safeguard ./wasm/v1.wasm ./wasm/v2.wasm
